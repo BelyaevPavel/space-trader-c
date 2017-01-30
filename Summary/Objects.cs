@@ -165,6 +165,43 @@ namespace Summary
             _direction = new Vector3 ();
         }
     }
+    public class Trade
+    {
+        Dictionary<int, int> _sellOffers;
+        Dictionary<int, int> _buyOffers;
+
+        public Dictionary<int, int> SellOffers
+        {
+            get
+            {
+                return _sellOffers;
+            }
+
+            set
+            {
+                _sellOffers = value;
+            }
+        }
+
+        public Dictionary<int, int> BuyOffers
+        {
+            get
+            {
+                return _buyOffers;
+            }
+
+            set
+            {
+                _buyOffers = value;
+            }
+        }
+        
+        public Trade()
+        {
+            _sellOffers = new Dictionary<int, int> ();
+            _buyOffers = new Dictionary<int, int> ();
+        }
+    }
     public class CargoHold
     {
         #region Fields
@@ -375,7 +412,7 @@ namespace Summary
         }
         #endregion
     }
-    public class Production : IUpdatable
+    public class Production : IUpdatable, IProduction
     {
         #region Fields
         //[XmlArray ("ProductioLines"), XmlArrayItem ("ProductionLine")]
@@ -711,6 +748,11 @@ namespace Summary
             }
             return extractedProduction;
         }
+
+        public Dictionary<int, int> GetProductionBalance()
+        {
+            return ProductionBalance;
+        }
         #endregion
 
         #region Event handlers
@@ -721,7 +763,7 @@ namespace Summary
         }
         #endregion
     }
-    public class ProductionLine : IProduction
+    public class ProductionLine : IProductionLine
     {
         #region Fields
         int _number;
@@ -1079,7 +1121,7 @@ namespace Summary
         }
         #endregion
     }
-    public class ShipBase : IMovableObject, IProducibleObject, IStorableObject
+    public class ShipBase : IMovable, IProducible, IStorable, ITargetable, ITrader
     {
         #region Fields
         //[XmlElement ("ID")]
@@ -1096,6 +1138,7 @@ namespace Summary
         Transform _objTransform;
         //[XmlElement ("DestinationTransform")]
         Transform _destTransform;
+        ITargetable _destination;
         //[XmlElement ("LoactionTitle")]
         string _locationTitle;
         //[XmlElement ("LoactionID")]
@@ -1276,6 +1319,20 @@ namespace Summary
                 _shipCargoHold = value;
             }
         }
+
+        [JsonProperty]
+        internal ITargetable Destination
+        {
+            get
+            {
+                return _destination;
+            }
+
+            set
+            {
+                _destination = value;
+            }
+        }
         #endregion
 
         #region Methods
@@ -1304,9 +1361,9 @@ namespace Summary
             return DestTransform.Position;
         }
 
-        public object GetDestination()
+        public ITargetable GetDestination()
         {
-            throw new NotImplementedException ();
+            return _destination;
         }
 
         public double GetProductionCost()
@@ -1355,9 +1412,24 @@ namespace Summary
             _destTransform = DestTransform;
             SetDirection ();
         }
+
+        public void FormTradeOffers()
+        {
+            throw new NotImplementedException ();
+        }
+
+        public Dictionary<int, int> GetBuyOffers()
+        {
+            throw new NotImplementedException ();
+        }
+
+        public Dictionary<int, int> GetSellOffers()
+        {
+            throw new NotImplementedException ();
+        }        
         #endregion
     }
-    public class StationBase : IUnmovableObject, IProducibleObject, IUpdatable
+    public class StationBase : IUnmovable, IProducible, IUpdatable, ITrader, ITargetable
     {
         #region Fields
         //[XmlElement ("ID")]
@@ -1377,6 +1449,7 @@ namespace Summary
         //[XmlElement ("CargoHold")]
         protected CargoHold _stationCargoHold;
         protected UpdateDelegate updateDelegate;
+        private Trade _tradeOffers;
         #endregion
 
         #region Properties
@@ -1491,6 +1564,20 @@ namespace Summary
                 _stationCargoHold = value;
             }
         }
+
+        [JsonProperty]
+        protected Trade TradeOffers
+        {
+            get
+            {
+                return _tradeOffers;
+            }
+
+            private set
+            {
+                _tradeOffers = value;
+            }
+        }
         #endregion
 
         #region Methods
@@ -1518,6 +1605,21 @@ namespace Summary
         {
             throw new NotImplementedException ();
         }
+
+        public virtual void FormTradeOffers()
+        {
+            throw new NotImplementedException ();
+        }
+
+        public virtual Dictionary<int, int> GetBuyOffers()
+        {
+            throw new NotImplementedException ();
+        }
+
+        public virtual Dictionary<int, int> GetSellOffers()
+        {
+            throw new NotImplementedException ();
+        }        
         #endregion
 
         #region Constructors
@@ -1525,10 +1627,11 @@ namespace Summary
         {
             _objTransform = new Transform ();
             _stationCargoHold = new CargoHold ();
+            _tradeOffers = new Trade ();
         }
         #endregion
     }
-    public class PlantStation : StationBase
+    public class PlantStation : StationBase, IProduction
     {
         //[XmlElement ("Production")]
         Production _production;
@@ -1556,6 +1659,7 @@ namespace Summary
                 ExtractProduction ();
                 _production.Update (TimeStep);
                 ProvideMaterials (TimeStep);
+                FormTradeOffers ();
             }
         }
 
@@ -1621,6 +1725,57 @@ namespace Summary
                     _stationCargoHold.Store (key, ref amount);
                 }
             }
+        }
+
+        public Dictionary<int, int> GetProductionBalance()
+        {
+            return ((IProduction) Production).GetProductionBalance ();
+        }
+
+        public override void FormTradeOffers()
+        {
+            int totalNegativeBalanceUnits = 0;
+            foreach (int key in _productionBalance.Keys)
+                if (_productionBalance [key] < 0)
+                    totalNegativeBalanceUnits -= _productionBalance [key];
+            foreach (int key in _productionBalance.Keys)
+            {
+                if (_productionBalance [key] >= 0)
+                {
+                    if (TradeOffers.SellOffers.ContainsKey (key))
+                    {
+                        TradeOffers.SellOffers [key] = StationCargoHold.StoredComodities [key];
+                    }
+                    else
+                    {
+                        TradeOffers.SellOffers.Add (key, StationCargoHold.StoredComodities [key]);
+                    }
+                }
+                else
+                {
+                    if (_productionBalance.ContainsKey (key))
+                    {
+                        if (TradeOffers.BuyOffers.ContainsKey (key))
+                        {
+                            TradeOffers.BuyOffers [key] = CargoHold.CalculateAmountToFillVolume (key, -(int) ((double) (_productionBalance [key]) / totalNegativeBalanceUnits * 0.5*StationCargoHold.FreeSpace));
+                        }
+                        else
+                        {
+                            TradeOffers.BuyOffers.Add (key, CargoHold.CalculateAmountToFillVolume (key, -(int) ((double) (_productionBalance [key]) / totalNegativeBalanceUnits * 0.5 * StationCargoHold.FreeSpace)));
+                        }
+                    }
+                }
+            }
+        }
+
+        public override Dictionary<int, int> GetBuyOffers()
+        {
+            return TradeOffers.BuyOffers;
+        }
+
+        public override Dictionary<int, int> GetSellOffers()
+        {
+            return TradeOffers.SellOffers;
         }
     }
     public class Fleet
@@ -1723,7 +1878,7 @@ namespace Summary
         {
         }
     }
-    public class ComodityTemplate : IProducibleObject, IStorableObject
+    public class ComodityTemplate : IProducible, IStorable
     {
         //[XmlElement ("ID")]
         int _id;

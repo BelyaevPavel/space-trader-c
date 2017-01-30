@@ -93,6 +93,11 @@ namespace Summary
         {
             length = Math.Sqrt (Math.Pow (x, 2) + Math.Pow (y, 2) + Math.Pow (z, 2));
         }
+
+        public static double CalculateLength(Vector3 v)
+        {
+            return Math.Sqrt (Math.Pow (v.x, 2) + Math.Pow (v.x, 2) + Math.Pow (v.x, 2));
+        }
         // Overloaded Operators
         public static Vector3 operator +(Vector3 v1, Vector3 v2)
         {

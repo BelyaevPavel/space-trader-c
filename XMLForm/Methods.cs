@@ -22,7 +22,9 @@ namespace XMLForm
                 GlobalData.comodityTemplates = JsonHelper.FromJsonFile<ComodityTamplates> ("ComodityTamplates.xml");
                 Relations.BuildRelations ();
                 PlantStation plant = PlantStationCreator ();//JsonHelper.FromJsonFile<PlantStation> ("FirstStation.xml");
+                PlantStation plant1 = PlantStationCreator1 ();
                 GlobalData.stations.Add (plant);
+                GlobalData.stations.Add (plant1);
                 ShipBase ship = JsonHelper.FromJsonFile<ShipBase> ("FirstShip.xml");
                 GlobalData.fleets = JsonHelper.FromJsonFile<Fleets> ("Fleets.xml");
             }
@@ -55,6 +57,7 @@ namespace XMLForm
             JsonHelper.ToJsonFile (GlobalData.fleets, "Fleets.xml");
             JsonHelper.ToJsonFile (GlobalData.comodityTemplates, "ComodityTamplates.xml");
             JsonHelper.ToJsonFile (GlobalData.stations [0], "FirstPlant.xml");
+            JsonHelper.ToJsonFile (GlobalData.stations , "Stations.xml");
 
             //XmlSerializer Serializer = new XmlSerializer (typeof (Fleets));
             //using (StreamWriter streamWriter = new StreamWriter ("Fleets.xml"))
@@ -116,6 +119,24 @@ namespace XMLForm
             int amount = 2000;
             plant.StationCargoHold.Store (1, ref amount);
             plant.AddProductionLine (1, 5, 1000);
+            return plant;
+        }
+
+        private static PlantStation PlantStationCreator1()
+        {
+            PlantStation plant = new PlantStation ()
+            {
+                LocationID = 1,
+                LocationTitle = "Nowhere",
+                ObjTransform = new Transform ()
+                {
+                    Position = new Vector3 (42, -21, -6)
+                },
+                StationCargoHold = new CargoHold (10000),
+                OwnerID = 1,
+                OwnerTitle = "Overlord",
+                Title = "First Plant"
+            };
             plant.AddProductionLine (1, 1, 1000);
             plant.AddProductionLine (1, 1, 1000);
             return plant;

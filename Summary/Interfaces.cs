@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Summary
 {
-    interface IMovableObject
+    public interface IMovable
     {
         double GetSpeed();
         Vector3 GetVelocity();
@@ -14,38 +14,63 @@ namespace Summary
         void SetDirection();
         Vector3 GetPosition();
         Vector3 GetDestPosition();
-        Object GetDestination();
+        ITargetable GetDestination();
         void SetDestination(Transform DestTransform);
         void Move(double TimeStep);
     }
-    interface IUnmovableObject
+    public interface IUnmovable
     {
         Vector3 GetPosition();
     }
-    interface IProducibleObject
+    public interface IProducible
     {
         double GetProductionCost();
         TimeSpan GetProductionTime();
         Dictionary<int, int> GetRequiredMaterials();
     }
-    interface IStorableObject
+    public interface IStorable
     {
         double GetVolume();
         double GetMass();
     }
-    interface IProduction
+    public interface ITargetable
+    {
+        Vector3 GetPosition();
+    }
+    public interface IDockable
+    {
+
+    }
+    public interface IDock
+    {
+
+    }
+    public interface IProductionLine
     {
         void SetProducibleComodity(int ComodityTamplateId);
 
         bool CheckResourseSatisfaction();
     }
-    interface IManagable
+    public interface IProduction
+    {
+        void AddProductionLine(ProductionLine NewProductionLine);
+        void AddProductionLine(int Priority,int ComodityTamplateId, int CargoHoldCapacity);
+        void AddProductionLine(int Priority, int ComodityTamplateId, CargoHold StarterCargoHold);
+        Dictionary<int, int> GetProductionBalance();
+    }
+    public interface IManagable
     {
         bool IsIdle();
         string CurrentOrder();
     }
-    interface IUpdatable
+    public interface IUpdatable
     {
         void Update(double TimeStep);
+    }
+    public interface ITrader
+    {
+        void FormTradeOffers();
+        Dictionary<int, int> GetBuyOffers();
+        Dictionary<int, int> GetSellOffers();
     }
 }
