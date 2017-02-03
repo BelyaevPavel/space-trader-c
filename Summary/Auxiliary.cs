@@ -348,11 +348,12 @@ namespace Summary
 
     public static class JsonHelper
     {
+        static JsonSerializerSettings defaultSettings;
+        static JsonSerializer serializer;
         public static void ToJsonFile(Object obj, string filePath)
         {
             using (StreamWriter file = new StreamWriter (filePath))
             {
-                JsonSerializer serializer = new JsonSerializer ();
                 serializer.Serialize (file, obj);
             }
         }
@@ -378,8 +379,27 @@ namespace Summary
 
         private static T FromJson<T>(string json)
         {
-            return JsonConvert.DeserializeObject<T> (json);
+            return JsonConvert.DeserializeObject<T> (json,defaultSettings);
+        }
+
+        static JsonHelper()
+        {
+            defaultSettings = new JsonSerializerSettings ();
+            defaultSettings.Formatting = Newtonsoft.Json.Formatting.Indented;
+            defaultSettings.PreserveReferencesHandling = PreserveReferencesHandling.Objects;
+            defaultSettings.TypeNameHandling = TypeNameHandling.Objects;
+            serializer = new JsonSerializer ();
+            serializer.PreserveReferencesHandling = defaultSettings.PreserveReferencesHandling;
+            serializer.TypeNameHandling = defaultSettings.TypeNameHandling;
+            serializer.Formatting = defaultSettings.Formatting;
         }
     }
 
+    public static class AuxMath
+    {
+        internal static int CalculatePriceLinear(int minCost, int baseCost, int maxCost, int Amount, int AllowableAmount)
+        {
+            return Amount < AllowableAmount ? (int) ((double) (minCost - maxCost) / AllowableAmount * Amount + maxCost) : minCost;
+        }
+    }
 }

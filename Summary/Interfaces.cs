@@ -36,6 +36,7 @@ namespace Summary
     public interface ITargetable
     {
         Vector3 GetPosition();
+        Transform GetTransform();
     }
     public interface IDockable
     {
@@ -58,10 +59,10 @@ namespace Summary
         void AddProductionLine(int Priority, int ComodityTamplateId, CargoHold StarterCargoHold);
         Dictionary<int, int> GetProductionBalance();
     }
-    public interface IManagable
+    public interface IManageable
     {
         bool IsIdle();
-        string CurrentOrder();
+        Order CurrentOrder();
     }
     public interface IUpdatable
     {
@@ -70,7 +71,10 @@ namespace Summary
     public interface ITrader
     {
         void FormTradeOffers();
+        Dictionary<int, int> Sell(TradeOffer Offer, ref int Payment, int AmountToSell);
+        bool Buy(TradeOffer Offer, ITrader Seller, int AmountToBuy);
         Dictionary<int, int> GetBuyOffers();
         Dictionary<int, int> GetSellOffers();
+        ITargetable GetTarget();
     }
 }

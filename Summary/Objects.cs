@@ -15,77 +15,161 @@ namespace Summary
     /// </summary>
     /// <param name="TimeStep">Time step in milliseconds</param>
     public delegate void UpdateDelegate(double TimeStep);
-    public static class LogAgregator
+
+    public enum TradeOfferType
     {
-        static List<LogEventArgs> _events = new List<LogEventArgs> ();
-
-        public static List<LogEventArgs> Events
-        {
-            get
-            {
-                return _events;
-            }
-
-            private set
-            {
-                _events = value;
-            }
-        }
-
-        public static void Log(LogEventArgs args)
-        {
-            _events.Add (args);
-        }
+        Sell = 0,
+        Buy = 1
     }
-    public class LogEventArgs : EventArgs
-    {
-        public LogEventArgs(string message, DateTime eventTime)
-        {
-            Message = message;
-            EventTime = eventTime;
-        }
 
-        [JsonProperty]
-        public string Message
-        {
-            get;
-            private set;
-        }
-
-        [JsonProperty]
-        public DateTime EventTime
-        {
-            get;
-            private set;
-        }
-    }
     public class GlobalData
     {
         public static UpdateDelegate updateDelegate;
 
-        public static Fleets fleets = new Fleets () { Title = "Fleets" };
+        [JsonProperty]
+        public static Fleets fleets;
 
-        public static List<StationBase> stations = new List<StationBase> ();
+        [JsonProperty]
+        public static List<StationBase> stations;
 
-        public static ComodityTamplates comodityTemplates = new ComodityTamplates ();
+        [JsonProperty]
+        public static List<ShipBase> ships;
 
-        public static ShipTamplates shipTemplates = new ShipTamplates ();
+        [JsonProperty]
+        public static List<TradeOffer> sellOffers;
 
-        public static World world = new World ();
+        [JsonProperty]
+        public static List<TradeOffer> buyOffers;
+
+        [JsonProperty]
+        public static ComodityTamplates comodityTemplates;
+
+        [JsonProperty]
+        public static ShipTamplates shipTemplates;
+
+        [JsonProperty]
+        public static World world;
+
+        [JsonProperty]
+        public static List<Owner> owners;
 
         public static System.Timers.Timer timer;// = new Timer(TimeStep);
 
+        [JsonProperty]
         public static DateTime CurrentTime = new DateTime (2409, 3, 5);
 
         public static double TimeStep = 100;
 
-        public static bool ShipSelected = false;
+        //[JsonProperty]
+        //public Fleets Fleets
+        //{
+        //    get
+        //    {
+        //        return fleets;
+        //    }
 
-        public static bool FleetSelected = false;
+        //    set
+        //    {
+        //        fleets = value;
+        //    }
+        //}
 
-        public static int FleetIndex = -1;
+        //[JsonProperty]
+        //public List<StationBase> Stations
+        //{
+        //    get
+        //    {
+        //        return stations;
+        //    }
 
-        public static int ShipIndex = -1;
+        //    set
+        //    {
+        //        stations = value;
+        //    }
+        //}
+
+        //[JsonProperty]
+        //public List<TradeOffer> SellOffers
+        //{
+        //    get
+        //    {
+        //        return sellOffers;
+        //    }
+
+        //    set
+        //    {
+        //        sellOffers = value;
+        //    }
+        //}
+
+        //[JsonProperty]
+        //public List<TradeOffer> BuyOffers
+        //{
+        //    get
+        //    {
+        //        return buyOffers;
+        //    }
+
+        //    set
+        //    {
+        //        buyOffers = value;
+        //    }
+        //}
+
+        //[JsonProperty]
+        //public ComodityTamplates ComodityTemplates
+        //{
+        //    get
+        //    {
+        //        return comodityTemplates;
+        //    }
+
+        //    set
+        //    {
+        //        comodityTemplates = value;
+        //    }
+        //}
+
+        //[JsonProperty]
+        //public ShipTamplates ShipTemplates
+        //{
+        //    get
+        //    {
+        //        return shipTemplates;
+        //    }
+
+        //    set
+        //    {
+        //        shipTemplates = value;
+        //    }
+        //}
+
+        //[JsonProperty]
+        //public World World
+        //{
+        //    get
+        //    {
+        //        return world;
+        //    }
+
+        //    set
+        //    {
+        //        world = value;
+        //    }
+        //}
+
+        public GlobalData()
+        {
+            fleets = new Fleets () { Title = "Fleets" };
+            stations = new List<StationBase> ();
+            sellOffers = new List<TradeOffer> ();
+            buyOffers = new List<TradeOffer> ();
+            comodityTemplates = new ComodityTamplates ();
+            shipTemplates = new ShipTamplates ();
+            world = new World ();
+            owners = new List<Owner> ();
+            ships = new List<Summary.ShipBase> ();
+        }
     }
     public static class Relations
     {
@@ -94,12 +178,15 @@ namespace Summary
         /// </summary>
         public static Dictionary<int, ComodityTemplate> IdToComodity = new Dictionary<int, ComodityTemplate> ();
 
+        public static Dictionary<int, Owner> IdToOwner = new Dictionary<int, Owner> ();
+
         public static void BuildRelations()
         {
             foreach (ComodityTemplate tamplate in GlobalData.comodityTemplates.ComodityTemplatesList)
             {
                 IdToComodity.Add (tamplate.Id, tamplate);
             }
+            IdToOwner.Add (1, new Owner (1000000));
         }
     }
     public class Transform
@@ -122,6 +209,7 @@ namespace Summary
             set
             {
                 _position = value;
+                //Log.Invoke (this, new LogEventArgs (string.Format ("Moved to ({0},{1},{2})", _position.X, _position.Y, _position.Z), GlobalData.CurrentTime));
             }
         }
 
@@ -136,6 +224,7 @@ namespace Summary
             set
             {
                 _velocity = value;
+                //Log.Invoke (this, new LogEventArgs (string.Format ("Velocity changed to {0},{1},{2}", _velocity.Length), GlobalData.CurrentTime));
             }
         }
 
@@ -153,9 +242,11 @@ namespace Summary
             }
         }
 
+        public event EventHandler<LogEventArgs> Log;
         public void Translate(double TimeStep)
         {
-            _position += _velocity * TimeStep;
+            // 0.001 coeff because of TimeStep in milleseconds.
+            _position += _velocity * (0.001*TimeStep);
         }
 
         public Transform()
@@ -163,6 +254,19 @@ namespace Summary
             _position = new Vector3 ();
             _velocity = new Vector3 ();
             _direction = new Vector3 ();
+        }
+
+        public Transform(Vector3 Position, Vector3 Velocity, Vector3 Direction)
+        {
+            _position = Position;
+            _velocity = Velocity;
+            _direction = Direction;
+        }
+
+        public Transform(Transform transform)
+            : this (transform.Position, transform.Velocity, transform.Direction)
+        {
+
         }
     }
     public class Trade
@@ -195,11 +299,109 @@ namespace Summary
                 _buyOffers = value;
             }
         }
-        
+
         public Trade()
         {
             _sellOffers = new Dictionary<int, int> ();
             _buyOffers = new Dictionary<int, int> ();
+        }
+    }
+    public class TradeOffer : IComparable<TradeOffer>, IEquatable<TradeOffer>
+    {
+        protected int comodityId;
+        protected int amount;
+        protected int price;
+        protected ITrader offerer;
+        protected TradeOfferType offerType;
+
+        public int ComodityId
+        {
+            get
+            {
+                return comodityId;
+            }
+
+            set
+            {
+                comodityId = value;
+            }
+        }
+
+        public int Amount
+        {
+            get
+            {
+                return amount;
+            }
+
+            set
+            {
+                amount = value;
+            }
+        }
+
+        public int Price
+        {
+            get
+            {
+                return price;
+            }
+
+            set
+            {
+                price = value;
+            }
+        }
+
+        public ITrader Offerer
+        {
+            get
+            {
+                return offerer;
+            }
+
+            set
+            {
+                offerer = value;
+            }
+        }
+
+        public TradeOfferType OfferType
+        {
+            get
+            {
+                return offerType;
+            }
+
+            set
+            {
+                offerType = value;
+            }
+        }
+
+        public TradeOffer(int comodityId, int amount, int price, TradeOfferType offerType, ITrader offerer)
+        {
+            ComodityId = comodityId;
+            Amount = amount;
+            Price = price;
+            Offerer = offerer;
+            OfferType = offerType;
+        }
+
+        public int CompareTo(TradeOffer other)
+        {
+            if (other == null)
+                return 1;
+
+            else
+                return this.price.CompareTo (other.price);
+        }
+
+        public bool Equals(TradeOffer other)
+        {
+            if (other == null)
+                return false;
+            return (this.price.Equals (other.price));
         }
     }
     public class CargoHold
@@ -401,6 +603,12 @@ namespace Summary
             return _storedComodities.ContainsKey (ComodityTamplateId);
         }
 
+        /// <summary>
+        /// Calculates volume that will be occupied by <paramref name="Amount"/> of comodity with id equal to <paramref name="ComodityTamplateId"/>.
+        /// </summary>
+        /// <param name="ComodityTamplateId">Sets comodity tamplate id.</param>
+        /// <param name="Amount">Sets amount of comodity.</param>
+        /// <returns>Calculated volume.</returns>
         public static int CalculateOccupaiedVolume(int ComodityTamplateId, int Amount)
         {
             return Relations.IdToComodity [ComodityTamplateId].Volume * Amount;
@@ -416,6 +624,7 @@ namespace Summary
     {
         #region Fields
         //[XmlArray ("ProductioLines"), XmlArrayItem ("ProductionLine")]
+        bool _delegatesInitialised;
         List<ProductionLine> _productionLines;
         CargoHold _productionCargoHold;
         Dictionary<int, int> _productionDemand;
@@ -437,6 +646,7 @@ namespace Summary
             private set
             {
                 _productionLines = value;
+                SignUpLines ();
             }
         }
 
@@ -499,9 +709,11 @@ namespace Summary
         #region Constructors
         public Production()
         {
+            _delegatesInitialised = false;
             _productionDemand = new Dictionary<int, int> ();
             _productionOutput = new Dictionary<int, int> ();
             _productionConsumption = new Dictionary<int, int> ();
+            _productionBalance = new Dictionary<int, int> ();
             ProductionCargoHold = new CargoHold ();
             ProductionLines = new List<ProductionLine> ();
             _productionCargoHold.Log += information_Log;
@@ -567,8 +779,7 @@ namespace Summary
         {
             ProductionLines.Add (NewProductionLine);
             ProductionLines.Last ().Number = ProductionLines.Count;
-            ProductionLines.Last ().Log += information_Log;
-            updateDelegate += ProductionLines.Last ().Update;
+            SignUpLine (ProductionLines.Last ());
             //AddToBalance (ProductionLines.Last ().ProducedComodityId);
         }
 
@@ -577,8 +788,7 @@ namespace Summary
             ProductionLine NewProductionLine = new ProductionLine (ComodityTamplateId, Priority, CargoHoldCapacity);
             ProductionLines.Add (NewProductionLine);
             ProductionLines.Last ().Number = ProductionLines.Count;
-            ProductionLines.Last ().Log += information_Log;
-            updateDelegate += ProductionLines.Last ().Update;
+            SignUpLine (ProductionLines.Last ());
             //AddToBalance (ComodityTamplateId);
         }
 
@@ -587,8 +797,7 @@ namespace Summary
             ProductionLine NewProductionLine = new ProductionLine (ComodityTamplateId, Priority, StarterCargoHold);
             ProductionLines.Add (NewProductionLine);
             ProductionLines.Last ().Number = ProductionLines.Count;
-            ProductionLines.Last ().Log += information_Log;
-            updateDelegate += ProductionLines.Last ().Update;
+            SignUpLine (ProductionLines.Last ());
             //AddToBalance (ComodityTamplateId);
         }
 
@@ -636,11 +845,33 @@ namespace Summary
 
         public void Update(double TimeStep)
         {
+            if (!_delegatesInitialised)
+            {
+                SignUpLines ();
+                _delegatesInitialised = true;
+            }
             //updateDelegate.Invoke ();
             ProvideMaterials (TimeStep);
-            foreach (ProductionLine line in _productionLines)
+            //foreach (ProductionLine line in _productionLines)
+            //{
+            //    line.Update (TimeStep);
+            //}
+            updateDelegate.Invoke (TimeStep);
+        }
+
+        private void SignUpLine(ProductionLine line)
+        {
+            line.Log -= information_Log;
+            line.Log += information_Log;
+            updateDelegate -= line.Update;
+            updateDelegate += line.Update;
+        }
+
+        private void SignUpLines()
+        {
+            foreach (ProductionLine line in ProductionLines)
             {
-                line.Update (TimeStep);
+                SignUpLine (line);
             }
         }
 
@@ -935,31 +1166,36 @@ namespace Summary
 
         public bool CheckResourseSatisfaction()
         {
-            Dictionary<int, int> requiredMaterials = Relations.IdToComodity [_producedComodityId].RequiredMaterials;
-            _productionDemandSatisfied = true;
-            foreach (int key in requiredMaterials.Keys)
+            if (Relations.IdToComodity.ContainsKey (_producedComodityId))
             {
-                if (_productionLineCargoHold.StoredComodities.ContainsKey (key))
+                Dictionary<int, int> requiredMaterials = Relations.IdToComodity [_producedComodityId].RequiredMaterials;
+                _productionDemandSatisfied = true;
+                foreach (int key in requiredMaterials.Keys)
                 {
-                    if (_productionLineCargoHold.StoredComodities [key] - requiredMaterials [key] < 0)
+                    if (_productionLineCargoHold.StoredComodities.ContainsKey (key))
+                    {
+                        if (_productionLineCargoHold.StoredComodities [key] - requiredMaterials [key] < 0)
+                        {
+                            _productionDemandSatisfied = false;
+                            AddDemand (requiredMaterials, key);
+                        }
+                    }
+                    else
                     {
                         _productionDemandSatisfied = false;
+                        _productionLineCargoHold.StoredComodities.Add (key, 0);
                         AddDemand (requiredMaterials, key);
                     }
                 }
-                else
+                if (!_productionDemandSatisfied)
                 {
-                    _productionDemandSatisfied = false;
-                    _productionLineCargoHold.StoredComodities.Add (key, 0);
-                    AddDemand (requiredMaterials, key);
+                    if (Log != null)
+                        Log (this, new LogEventArgs (string.Format ("Line {0} - production demand is not satisfied.", _number), GlobalData.CurrentTime));
                 }
+                return _productionDemandSatisfied;
             }
-            if (!_productionDemandSatisfied)
-            {
-                if (Log != null)
-                    Log (this, new LogEventArgs (string.Format ("Line {0} - production demand is not satisfied.", _number), GlobalData.CurrentTime));
-            }
-            return _productionDemandSatisfied;
+            else
+                return false;
         }
 
         private void AddDemand(Dictionary<int, int> requiredMaterials, int key)
@@ -1121,663 +1357,7 @@ namespace Summary
         }
         #endregion
     }
-    public class ShipBase : IMovable, IProducible, IStorable, ITargetable, ITrader
-    {
-        #region Fields
-        //[XmlElement ("ID")]
-        int _id;
-        //[XmlElement ("Title")]
-        string _title;
-        //[XmlElement ("Speed")]
-        double _currentSpeed;
-        //[XmlElement ("MaximalSpeed")]
-        double _maxSpeed;
-        //[XmlElement ("Acceleration")]
-        double _acceleration;
-        //[XmlElement ("ObjectTransform")]
-        Transform _objTransform;
-        //[XmlElement ("DestinationTransform")]
-        Transform _destTransform;
-        ITargetable _destination;
-        //[XmlElement ("LoactionTitle")]
-        string _locationTitle;
-        //[XmlElement ("LoactionID")]
-        int _locationID;
-        //[XmlElement ("OwnerTitle")]
-        string _ownerTitle;
-        //[XmlElement ("OwnerID")]
-        int _ownerID;
-        //[XmlElement ("CargoHold")]
-        CargoHold _shipCargoHold;
-        #endregion
 
-        #region Properties
-        [JsonProperty]
-        public int Id
-        {
-            get
-            {
-                return _id;
-            }
-
-            set
-            {
-                _id = value;
-            }
-        }
-
-        [JsonProperty]
-        public string Title
-        {
-            get
-            {
-                return _title;
-            }
-
-            set
-            {
-                _title = value;
-            }
-        }
-
-        [JsonProperty]
-        public double CurrentSpeed
-        {
-            get
-            {
-                return _currentSpeed;
-            }
-
-            set
-            {
-                _currentSpeed = value;
-            }
-        }
-
-        [JsonProperty]
-        public double MaxSpeed
-        {
-            get
-            {
-                return _maxSpeed;
-            }
-
-            set
-            {
-                _maxSpeed = value;
-            }
-        }
-
-        [JsonProperty]
-        public double Acceleration
-        {
-            get
-            {
-                return _acceleration;
-            }
-
-            set
-            {
-                _acceleration = value;
-            }
-        }
-
-        [JsonProperty]
-        public string LocationTitle
-        {
-            get
-            {
-                return _locationTitle;
-            }
-
-            set
-            {
-                _locationTitle = value;
-            }
-        }
-
-        [JsonProperty]
-        public int LocationID
-        {
-            get
-            {
-                return _locationID;
-            }
-
-            set
-            {
-                _locationID = value;
-            }
-        }
-
-        [JsonProperty]
-        public string OwnerTitle
-        {
-            get
-            {
-                return _ownerTitle;
-            }
-
-            set
-            {
-                _ownerTitle = value;
-            }
-        }
-
-        [JsonProperty]
-        public int OwnerID
-        {
-            get
-            {
-                return _ownerID;
-            }
-
-            set
-            {
-                _ownerID = value;
-            }
-        }
-
-        [JsonProperty]
-        public Transform ObjTransform
-        {
-            get
-            {
-                return _objTransform;
-            }
-
-            set
-            {
-                _objTransform = value;
-            }
-        }
-
-        [JsonProperty]
-        public Transform DestTransform
-        {
-            get
-            {
-                return _destTransform;
-            }
-
-            set
-            {
-                _destTransform = value;
-            }
-        }
-
-        [JsonProperty]
-        public CargoHold ShipCargoHold
-        {
-            get
-            {
-                return _shipCargoHold;
-            }
-
-            set
-            {
-                _shipCargoHold = value;
-            }
-        }
-
-        [JsonProperty]
-        internal ITargetable Destination
-        {
-            get
-            {
-                return _destination;
-            }
-
-            set
-            {
-                _destination = value;
-            }
-        }
-        #endregion
-
-        #region Methods
-        public double GetSpeed()
-        {
-            return CurrentSpeed;
-        }
-
-        public Vector3 GetVelocity()
-        {
-            return ObjTransform.Velocity;
-        }
-
-        public Vector3 GetDirection()
-        {
-            return ObjTransform.Direction;
-        }
-
-        public Vector3 GetPosition()
-        {
-            return ObjTransform.Position;
-        }
-
-        public Vector3 GetDestPosition()
-        {
-            return DestTransform.Position;
-        }
-
-        public ITargetable GetDestination()
-        {
-            return _destination;
-        }
-
-        public double GetProductionCost()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public TimeSpan GetProductionTime()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public Dictionary<int, int> GetRequiredMaterials()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public double GetVolume()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public double GetMass()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public void Move(double TimeStep)
-        {
-            if (ObjTransform.Velocity.Length < MaxSpeed)
-            {
-                ObjTransform.Velocity += ObjTransform.Direction * (Acceleration * TimeStep);
-            }
-            CurrentSpeed = ObjTransform.Velocity.Length;
-            ObjTransform.Translate (TimeStep);
-        }
-
-        public void SetDirection()
-        {
-            ObjTransform.Direction = DestTransform.Position - ObjTransform.Position;
-            ObjTransform.Velocity = ~ObjTransform.Direction;
-        }
-
-        public void SetDestination(Transform DestTransform)
-        {
-            _destTransform = DestTransform;
-            SetDirection ();
-        }
-
-        public void FormTradeOffers()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public Dictionary<int, int> GetBuyOffers()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public Dictionary<int, int> GetSellOffers()
-        {
-            throw new NotImplementedException ();
-        }        
-        #endregion
-    }
-    public class StationBase : IUnmovable, IProducible, IUpdatable, ITrader, ITargetable
-    {
-        #region Fields
-        //[XmlElement ("ID")]
-        protected int _id;
-        //[XmlElement ("Title")]
-        protected String _title;
-        //[XmlElement ("ObjectTransform")]
-        protected Transform _objTransform;
-        //[XmlElement ("LoactionTitle")]
-        protected String _locationTitle;
-        //[XmlElement ("LoactionID")]
-        protected int _locationID;
-        //[XmlElement ("OwnerTitle")]
-        protected String _ownerTitle;
-        //[XmlElement ("OwnerID")]
-        protected int _ownerID;
-        //[XmlElement ("CargoHold")]
-        protected CargoHold _stationCargoHold;
-        protected UpdateDelegate updateDelegate;
-        private Trade _tradeOffers;
-        #endregion
-
-        #region Properties
-        [JsonProperty]
-        public int Id
-        {
-            get
-            {
-                return _id;
-            }
-
-            set
-            {
-                _id = value;
-            }
-        }
-
-        [JsonProperty]
-        public string Title
-        {
-            get
-            {
-                return _title;
-            }
-
-            set
-            {
-                _title = value;
-            }
-        }
-
-        [JsonProperty]
-        public Transform ObjTransform
-        {
-            get
-            {
-                return _objTransform;
-            }
-
-            set
-            {
-                _objTransform = value;
-            }
-        }
-
-        [JsonProperty]
-        public String LocationTitle
-        {
-            get
-            {
-                return _locationTitle;
-            }
-
-            set
-            {
-                _locationTitle = value;
-            }
-        }
-
-        [JsonProperty]
-        public int LocationID
-        {
-            get
-            {
-                return _locationID;
-            }
-
-            set
-            {
-                _locationID = value;
-            }
-        }
-
-        [JsonProperty]
-        public String OwnerTitle
-        {
-            get
-            {
-                return _ownerTitle;
-            }
-
-            set
-            {
-                _ownerTitle = value;
-            }
-        }
-
-        [JsonProperty]
-        public int OwnerID
-        {
-            get
-            {
-                return _ownerID;
-            }
-
-            set
-            {
-                _ownerID = value;
-            }
-        }
-
-        [JsonProperty]
-        public CargoHold StationCargoHold
-        {
-            get
-            {
-                return _stationCargoHold;
-            }
-
-            set
-            {
-                _stationCargoHold = value;
-            }
-        }
-
-        [JsonProperty]
-        protected Trade TradeOffers
-        {
-            get
-            {
-                return _tradeOffers;
-            }
-
-            private set
-            {
-                _tradeOffers = value;
-            }
-        }
-        #endregion
-
-        #region Methods
-        public Vector3 GetPosition()
-        {
-            return ObjTransform.Position;
-        }
-
-        public double GetProductionCost()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public TimeSpan GetProductionTime()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public Dictionary<int, int> GetRequiredMaterials()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public virtual void Update(double TimeStep)
-        {
-            throw new NotImplementedException ();
-        }
-
-        public virtual void FormTradeOffers()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public virtual Dictionary<int, int> GetBuyOffers()
-        {
-            throw new NotImplementedException ();
-        }
-
-        public virtual Dictionary<int, int> GetSellOffers()
-        {
-            throw new NotImplementedException ();
-        }        
-        #endregion
-
-        #region Constructors
-        public StationBase()
-        {
-            _objTransform = new Transform ();
-            _stationCargoHold = new CargoHold ();
-            _tradeOffers = new Trade ();
-        }
-        #endregion
-    }
-    public class PlantStation : StationBase, IProduction
-    {
-        //[XmlElement ("Production")]
-        Production _production;
-        Dictionary<int, int> _productionBalance;
-
-        [JsonProperty]
-        Production Production
-        {
-            get
-            {
-                return _production;
-            }
-
-            set
-            {
-                _production = value;
-            }
-        }
-
-        public override void Update(double TimeStep)
-        {
-            lock (this)
-            {
-                //updateDelegate.Invoke (TimeStep);
-                ExtractProduction ();
-                _production.Update (TimeStep);
-                ProvideMaterials (TimeStep);
-                FormTradeOffers ();
-            }
-        }
-
-        public void AddProductionLine(ProductionLine NewProductionLine)
-        {
-            _production.AddProductionLine (NewProductionLine);
-            _productionBalance = _production.RecalculateBalance ();
-        }
-
-        public void AddProductionLine(int Priority, int ComodityTamplateId, int CargoHoldCapacity)
-        {
-            _production.AddProductionLine (Priority, ComodityTamplateId, CargoHoldCapacity);
-            _productionBalance = _production.RecalculateBalance ();
-        }
-
-        public void AddProductionLine(int Priority, int ComodityTamplateId, CargoHold StarterCargoHold)
-        {
-            _production.AddProductionLine (Priority, ComodityTamplateId, StarterCargoHold);
-            _productionBalance = _production.RecalculateBalance ();
-        }
-
-        private void ExtractProduction()
-        {
-            Dictionary<int, int> extractedProduction = _production.ExtractProduction (_stationCargoHold.FreeSpace);
-            foreach (int key in extractedProduction.Keys)
-            {
-                int amount = extractedProduction [key];
-                _stationCargoHold.Store (key, ref amount);
-            }
-        }
-
-        public PlantStation()
-        {
-            _production = new Production ();
-            _productionBalance = new Dictionary<int, int> ();
-            _production.Log += _production_Log;
-            updateDelegate += _production.Update;
-            updateDelegate += ProvideMaterials;
-            Production.ProductionCargoHold.Capacity += 500;
-        }
-
-        private void _production_Log(object sender, LogEventArgs e)
-        {
-            LogAgregator.Log (new LogEventArgs (_title + " - " + e.Message, e.EventTime));
-        }
-
-        private void ProvideMaterials(double TimeStep)
-        {
-            Dictionary<int, int> requestedMaterials = _production.RequestMaterials ();
-            Dictionary<int, int> providedMaterials = new Dictionary<int, int> ();
-            foreach (int key in requestedMaterials.Keys)
-            {
-                if (requestedMaterials [key] > 0)
-                    providedMaterials.Add (key, _stationCargoHold.Extract (key, requestedMaterials [key]) [key]);
-            }
-
-            Dictionary<int, int> rests = _production.ResiveMaterials (providedMaterials);
-            foreach (int key in rests.Keys)
-            {
-                if (rests [key] > 0)
-                {
-                    int amount = rests [key];
-                    _stationCargoHold.Store (key, ref amount);
-                }
-            }
-        }
-
-        public Dictionary<int, int> GetProductionBalance()
-        {
-            return ((IProduction) Production).GetProductionBalance ();
-        }
-
-        public override void FormTradeOffers()
-        {
-            int totalNegativeBalanceUnits = 0;
-            foreach (int key in _productionBalance.Keys)
-                if (_productionBalance [key] < 0)
-                    totalNegativeBalanceUnits -= _productionBalance [key];
-            foreach (int key in _productionBalance.Keys)
-            {
-                if (_productionBalance [key] >= 0)
-                {
-                    if (TradeOffers.SellOffers.ContainsKey (key))
-                    {
-                        TradeOffers.SellOffers [key] = StationCargoHold.StoredComodities [key];
-                    }
-                    else
-                    {
-                        TradeOffers.SellOffers.Add (key, StationCargoHold.StoredComodities [key]);
-                    }
-                }
-                else
-                {
-                    if (_productionBalance.ContainsKey (key))
-                    {
-                        if (TradeOffers.BuyOffers.ContainsKey (key))
-                        {
-                            TradeOffers.BuyOffers [key] = CargoHold.CalculateAmountToFillVolume (key, -(int) ((double) (_productionBalance [key]) / totalNegativeBalanceUnits * 0.5*StationCargoHold.FreeSpace));
-                        }
-                        else
-                        {
-                            TradeOffers.BuyOffers.Add (key, CargoHold.CalculateAmountToFillVolume (key, -(int) ((double) (_productionBalance [key]) / totalNegativeBalanceUnits * 0.5 * StationCargoHold.FreeSpace)));
-                        }
-                    }
-                }
-            }
-        }
-
-        public override Dictionary<int, int> GetBuyOffers()
-        {
-            return TradeOffers.BuyOffers;
-        }
-
-        public override Dictionary<int, int> GetSellOffers()
-        {
-            return TradeOffers.SellOffers;
-        }
-    }
     public class Fleet
     {
         //[XmlElement ("Title")]
@@ -1886,6 +1466,9 @@ namespace Summary
         String _title;
         //[XmlElement ("Volume")]
         int _volume;
+        int _baseCost;
+        int _minCost;
+        int _maxCost;
         int _producedPerCycle;
         //[XmlElement ("Mass")]
         double _mass;
@@ -1991,6 +1574,59 @@ namespace Summary
             }
         }
 
+        [JsonProperty]
+        public int BaseCost
+        {
+            get
+            {
+                return _baseCost;
+            }
+
+            set
+            {
+                int oldValue = _baseCost;
+                _baseCost = value;
+                if (OnCostChange != null && oldValue != _baseCost)
+                    OnCostChange (this, new LogEventArgs (string.Format ("Base cost of {0} is changed to {1}", _title, _baseCost), GlobalData.CurrentTime));
+            }
+        }
+
+        [JsonProperty]
+        public int MinCost
+        {
+            get
+            {
+                return _minCost;
+            }
+
+            set
+            {
+                int oldValue = _minCost;
+                _minCost = value;
+                if (OnCostChange != null && oldValue != _minCost)
+                    OnCostChange (this, new LogEventArgs (string.Format ("Minimal cost of {0} is changed to {1}", _title, _minCost), GlobalData.CurrentTime));
+            }
+        }
+
+        [JsonProperty]
+        public int MaxCost
+        {
+            get
+            {
+                return _maxCost;
+            }
+
+            set
+            {
+                int oldValue = _minCost;
+                _maxCost = value;
+                if (OnCostChange != null && oldValue != _maxCost)
+                    OnCostChange (this, new LogEventArgs (string.Format ("Maximal cost of {0} is changed to {1}", _title, _maxCost), GlobalData.CurrentTime));
+            }
+        }
+
+        public event EventHandler<LogEventArgs> OnCostChange;
+
         public double GetProductionCost()
         {
             throw new NotImplementedException ();
@@ -2016,9 +1652,36 @@ namespace Summary
             return _mass;
         }
 
+        public void RecalculateCosts()
+        {
+            int newMinCost = 0;
+            if (_requiredMaterials.Count > 0)
+            {
+                foreach (int key in _requiredMaterials.Keys)
+                    newMinCost += Relations.IdToComodity [key]._baseCost;
+                MinCost = newMinCost;
+                if (MinCost * 1.5 > _baseCost)
+                    BaseCost = MinCost * 2;
+                else
+                {
+                    if (MinCost * 2.5 < _baseCost)
+                    {
+                        BaseCost = MinCost * 2;
+                    }
+                }
+                MaxCost = _baseCost + Math.Abs (_baseCost - _minCost);
+            }
+            else
+            {
+                MinCost = _baseCost / 2;
+                MaxCost = _baseCost * 2;
+            }
+        }
+
         public ComodityTemplate()
         {
             _requiredMaterials = new Dictionary<int, int> ();
+            RecalculateCosts ();
         }
     }
     public class ComodityTamplates
@@ -2128,7 +1791,7 @@ namespace Summary
     }
     public class Owner
     {
-
+        int _balance;
         //[XmlElement ("ID")]
         [JsonProperty]
         public int id
@@ -2143,10 +1806,33 @@ namespace Summary
             get;
             set;
         }
+
+        public int Balance
+        {
+            get
+            {
+                return _balance;
+            }
+
+            set
+            {
+                _balance = value;
+            }
+        }
+
         //[XmlArray ("Owned Ships"), XmlArrayItem ("Ship")]
         [JsonProperty]
-        public List<Fleet> ownedShips = new List<Fleet> ();
+        public List<Fleet> ownedShips;
+        public Owner()
+        {
+            ownedShips = new List<Summary.Fleet> ();
+        }
 
+        public Owner(int balance)
+            : this ()
+        {
+            Balance = balance;
+        }
     }
     public class World
     {
